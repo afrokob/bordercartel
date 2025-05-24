@@ -40,389 +40,446 @@
         </script><!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Border Cartel</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <style>
-        body { font-family: 'Courier New', monospace; background-color: #1a202c; color: #e2e8f0; }
-        .game-container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        .inventory-table, .market-table { width: 100%; border-collapse: collapse; }
-        .inventory-table th, .inventory-table td, .market-table th, .market-table td { border: 1px solid #4a5568; padding: 8px; text-align: center; }
-        .btn { transition: background-color 0.3s; }
-        .btn:hover { background-color: #d1d5db; } /* Hover effect for light gray */
-        #event-log { height: 100px; overflow-y: scroll; background-color: #2d3748; padding: 10px; border-radius: 5px; }
-        .tooltip { position: relative; display: inline-block; cursor: pointer; }
-        .tooltip .tooltiptext { 
-            visibility: hidden; width: 200px; background-color: #4a5568; color: #fff; 
-            text-align: center; border-radius: 5px; padding: 5px; position: absolute; 
-            z-index: 1; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; 
-            transition: opacity 0.3s; 
-        }
-        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
-        .ad-container { margin-top: 10px; text-align: center; }
-        .ad-placeholder { background-color: #4a5568; padding: 10px; border-radius: 5px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Border Cartel</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-hover: #334155;
+      --text: #f1f5f9;
+      --accent: #fbbf24;
+      --danger: #dc2626;
+      font-family: "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* BASIC LAYOUT */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    /* TOP HUD */
+    #hud {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--panel);
+      padding: .5rem .75rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem 1rem;
+      font-size: .9rem;
+    }
+    #hud span { white-space: nowrap; }
+    #hud .label { opacity:.7; margin-right:.25rem; }
+
+    /* TRAVEL BAR */
+    #travelBar {
+      display: flex;
+      overflow-x: auto;
+      gap: .5rem;
+      padding: .75rem .5rem .5rem;
+      background: var(--bg);
+      scrollbar-width: none;
+    }
+    #travelBar::-webkit-scrollbar { display:none; }
+
+    .city-btn {
+      flex: 0 0 auto;
+      padding: .6rem 1.25rem;
+      border-radius: .75rem;
+      background: var(--panel);
+      color: var(--text);
+      border: 2px solid transparent;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .1s, color .2s;
+    }
+    .city-btn:hover { background: var(--panel-hover); }
+    .city-btn:active { transform: scale(.95); }
+    .city-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    /* MAIN GRID */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      padding: 1rem;
+    }
+    @media(min-width: 640px){
+      main { grid-template-columns: repeat(2,1fr); }
+    }
+    section {
+      background: var(--panel);
+      border-radius: .75rem;
+      padding: .75rem;
+      overflow: hidden;
+    }
+    h2 { margin: .25rem 0 .75rem; font-size: 1rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size:.85rem; }
+    th, td { padding: .4rem .25rem; text-align: center; }
+    thead { background: var(--panel-hover); }
+    tbody tr:nth-child(odd) { background: rgba(255,255,255,.02); }
+
+    button.buy, button.sell {
+      padding: .25rem .5rem;
+      border-radius: .5rem;
+      border:none;
+      cursor: pointer;
+      font-weight: 600;
+      background: var(--accent);
+      color: var(--bg);
+      transition: opacity .15s;
+    }
+    button.buy:disabled, button.sell:disabled { opacity:.4; cursor:not-allowed; }
+
+    #log {
+      font-family: monospace;
+      max-height: 12rem;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size:.75rem;
+    }
+
+    /* NEXT DAY BTN */
+    #nextDayBtn {
+      width: 100%;
+      margin-top: .5rem;
+      padding: .75rem;
+      border-radius: .75rem;
+      background: var(--danger);
+      font-weight: 700;
+      border:none;
+      cursor:pointer;
+      transition: background .2s, transform .05s;
+    }
+    #nextDayBtn:hover { background:#b91c1c; }
+    #nextDayBtn:active { transform: scale(.97); }
+
+    /* AD SPACE */
+    .ad-container { margin-top: .5rem; text-align: center; }
+    .ad-placeholder { background: #4a5568; padding: .5rem; border-radius: .5rem; font-size: .75rem; }
+  </style>
 </head>
 <body>
-    <div class="game-container">
-        <h1 class="text-3xl font-bold text-center mb-4">Border Cartel</h1>
-        <div class="flex justify-between mb-4">
-            <div>
-                <p><strong>Day:</strong> <span id="day">1</span>/30</p>
-                <p><strong>Cash:</strong> $<span id="cash">5000</span></p>
-                <p><strong>Debt:</strong> $<span id="debt">10000</span></p>
-            </div>
-            <div>
-                <p><strong>Location:</strong> <span id="location">Tijuana</span></p>
-                <p><strong>Travels Left:</strong> <span id="travels-left">5</span></p>
-                <p class="tooltip">
-                    <strong>Heat:</strong> <span id="heat">0</span>%
-                    <span class="tooltiptext">Heat increases with buy/sell/travel, raising risks of getting busted or robbed.</span>
-                </p>
-            </div>
-        </div>
+  <!-- HUD -->
+  <div id="hud">
+    <span><span class="label">Day:</span><strong id="day">1</strong>/30</span>
+    <span><span class="label">Cash:</span>$<strong id="cash">0</strong></span>
+    <span><span class="label">Debt:</span>$<strong id="debt">0</strong></span>
+    <span><span class="label">Location:</span><strong id="location">Tijuana</strong></span>
+    <span><span class="label">Travels:</span><strong id="travels-left">5</strong></span>
+    <span><span class="label">Heat:</span><strong id="heat">0%</strong></span>
+  </div>
 
-        <h2 class="text-xl font-semibold mb-2">Travel</h2>
-        <div class="grid grid-cols-3 gap-2 mb-4">
-            <button id="tijuana-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('Tijuana')">Tijuana</button>
-            <button id="elpaso-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('ElPaso')">El Paso</button>
-            <button id="nogales-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('Nogales')">Nogales</button>
-        </div>
+  <!-- TRAVEL BAR -->
+  <div id="travelBar"></div>
 
-        <h2 class="text-xl font-semibold mb-2">Market</h2>
-        <table class="market-table mb-4">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Price</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="market"></tbody>
-        </table>
+  <!-- MAIN CONTENT -->
+  <main>
+    <!-- Market -->
+    <section>
+      <h2>Market Prices</h2>
+      <table>
+        <thead><tr><th>Item</th><th>Price</th><th>Buy</th></tr></thead>
+        <tbody id="marketBody"></tbody>
+      </table>
+    </section>
 
-        <h2 class="text-xl font-semibold mb-2">Inventory</h2>
-        <table class="inventory-table mb-4">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="inventory"></tbody>
-        </table>
+    <!-- Inventory -->
+    <section>
+      <h2>Your Inventory</h2>
+      <table>
+        <thead><tr><th>Item</th><th>Qty</th><th>Sell</th></tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+      <button id="nextDayBtn">Next Day</button>
+      <div class="ad-container">
+        <div class="ad-placeholder">Ad Space: 300x250 Banner Ad Here</div>
+      </div>
+    </section>
 
-        <h2 class="text-xl font-semibold mb-2">Event Log</h2>
-        <div id="event-log" class="text-sm"></div>
+    <!-- Log -->
+    <section style="grid-column:1/-1;">
+      <h2>Event Log</h2>
+      <div id="log"></div>
+    </section>
+  </main>
 
-        <button class="btn bg-red-600 text-white py-2 px-4 rounded mt-4" onclick="nextDay()">Next Day</button>
-        <div class="ad-container">
-            <div class="ad-placeholder">Ad Space: 300x250 Banner Ad Here</div>
-        </div>
-    </div>
+  <script>
+    /* ----------------- GAME DATA ----------------- */
+    const cities = ["Tijuana", "ElPaso", "Nogales"];
+    const items = {
+      fentanyl: { displayName: "Fentanyl", base: 10000, vol: 0.7, heatBuy: 5, heatSell: 3 },
+      meth: { displayName: "Meth", base: 5000, vol: 0.5, heatBuy: 5, heatSell: 3 },
+      weapons: { displayName: "Weapons", base: 20000, vol: 0.6, heatBuy: 7, heatSell: 5 }
+    };
+    const events = [
+      {
+        message: 'DEA bust in Tijuana! Fentanyl prices spike.',
+        effect: function() { updatePrices('fentanyl', 1.5); }
+      }
+    ];
+    const gameState = {
+      day: 1,
+      cash: 5000,
+      debt: 10000,
+      location: "Tijuana",
+      travelsLeft: 5,
+      maxTravels: 5,
+      heat: 0,
+      maxInventory: 100,
+      inventory: { fentanyl: 0, meth: 0, weapons: 0 },
+      prices: {}
+    };
 
-    <script>
-        console.log('Starting script parse at line 100');
-        try {
-            // Inventory
-            console.log('Parsing inventory at line 103');
-            const inventory = { fentanyl: 0, meth: 0, weapons: 0 };
-            console.log('inventory parsed at line 105:', JSON.stringify(inventory));
+    /* ----------------- HELPER FUNCS ----------------- */
+    function rand() { return Math.random(); }
+    function clamp(v, mi, ma) { return Math.min(Math.max(v, mi), ma); }
+    function log(msg) {
+      const div = document.getElementById('log');
+      div.textContent += `\n${msg}`;
+      div.scrollTop = div.scrollHeight;
+    }
 
-            // Prices
-            console.log('Parsing prices at line 108');
-            const prices = {
-                Tijuana: { fentanyl: 0, meth: 0, weapons: 0 },
-                ElPaso: { fentanyl: 0, meth: 0, weapons: 0 },
-                Nogales: { fentanyl: 0, meth: 0, weapons: 0 }
-            };
-            console.log('prices parsed at line 113:', JSON.stringify(prices));
+    /* ----------------- PRICE GENERATION ----------------- */
+    function initPrices() {
+      gameState.prices = {};
+      cities.forEach(c => {
+        gameState.prices[c] = {};
+        Object.keys(items).forEach(k => {
+          const { base, vol } = items[k];
+          gameState.prices[c][k] = Math.round(base * (1 + (rand() - 0.5) * vol));
+        });
+      });
+    }
 
-            // gameState
-            console.log('Parsing gameState at line 116');
-            let gameState = {
-                day: 1,
-                cash: 5000,
-                debt: 10000,
-                location: 'Tijuana',
-                heat: 0,
-                inventory: inventory,
-                maxInventory: 100,
-                prices: prices,
-                travelsLeft: 5,
-                maxTravels: 5
-            };
-            console.log('gameState parsed at line 126:', JSON.stringify(gameState));
-
-            // items
-            console.log('Parsing items at line 129');
-            const items = [
-                { name: 'fentanyl', displayName: 'Fentanyl', basePrice: 10000, volatility: 0.7, heatBuy: 5, heatSell: 3 },
-                { name: 'meth', displayName: 'Meth', basePrice: 5000, volatility: 0.5, heatBuy: 5, heatSell: 3 },
-                { name: 'weapons', displayName: 'Weapons', basePrice: 20000, volatility: 0.6, heatBuy: 7, heatSell: 5 }
-            ];
-            console.log('items parsed at line 134:', JSON.stringify(items));
-
-            // Random events
-            console.log('Parsing events at line 137');
-            const event = {
-                message: 'DEA bust in Tijuana! Fentanyl prices spike.',
-                effect: function() { updatePrices('fentanyl', 1.5); }
-            };
-            console.log('event parsed at line 141:', JSON.stringify({ message: event.message }));
-            const events = [event];
-            console.log('events array parsed at line 143:', JSON.stringify(events.map(e => ({ message: e.message }))));
-
-            function initializePrices() {
-                console.log('Initializing prices at line 147');
-                const cities = ['Tijuana', 'ElPaso', 'Nogales'];
-                cities.forEach(function(city) {
-                    items.forEach(function(item) {
-                        if (item.name && gameState.prices[city]) {
-                            try {
-                                gameState.prices[city][item.name] = Math.floor(item.basePrice * (1 + (Math.random() - 0.5) * item.volatility));
-                                console.log(`Set price for ${item.displayName} in ${city}: ${gameState.prices[city][item.name]} at line 153`);
-                            } catch (e) {
-                                console.error(`Error setting price for ${item.displayName} in ${city} at line 154:`, e);
-                            }
-                        } else {
-                            console.error(`Invalid item name or city at line 156:`, item, city);
-                        }
-                    });
-                });
-                console.log('Prices initialized at line 159:', JSON.stringify(gameState.prices));
-            }
-
-            function checkPerActionRisk(actionType) {
-                console.log(`Checking per-action risk after ${actionType} at line 163`);
-                if (gameState.heat >= 80) {
-                    const bustChance = 0.05 + (0.05 * (gameState.heat - 80) / 20); // 5% at 80, 10% at 100
-                    const bustRoll = Math.random();
-                    console.log(`Per-action bust chance: ${(bustChance * 100).toFixed(1)}% (rolled ${bustRoll.toFixed(3)}).`);
-                    if (bustRoll < bustChance) {
-                        logEvent(`Border Czar raid after ${actionType}! Lose all inventory and 50% cash.`);
-                        gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
-                        gameState.cash = Math.floor(gameState.cash * 0.5);
-                        gameState.heat = 0;
-                        logEvent('Heat reset to 0% after raid.');
-                        return true;
-                    }
-                }
-                if (gameState.heat >= 60) {
-                    const rivalChance = 0.03 + (0.05 * (gameState.heat - 60) / 40); // 3% at 60, 8% at 100
-                    const rivalRoll = Math.random();
-                    console.log(`Per-action rival attack chance: ${(rivalChance * 100).toFixed(1)}% (rolled ${rivalRoll.toFixed(3)}).`);
-                    if (rivalRoll < rivalChance) {
-                        logEvent(`Rival cartel attack after ${actionType}! Lose 30% inventory and 15% cash.`);
-                        Object.keys(gameState.inventory).forEach(function(item) {
-                            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
-                        });
-                        gameState.cash = Math.floor(gameState.cash * 0.85);
-                        gameState.heat = Math.max(0, gameState.heat - 10);
-                        logEvent(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            function updateUI() {
-                console.log('Updating UI at line 190');
-                document.getElementById('day').textContent = gameState.day;
-                document.getElementById('cash').textContent = gameState.cash.toLocaleString();
-                document.getElementById('debt').textContent = gameState.debt.toLocaleString();
-                document.getElementById('location').textContent = gameState.location === 'ElPaso' ? 'El Paso' : gameState.location;
-                document.getElementById('travels-left').textContent = gameState.travelsLeft;
-                document.getElementById('heat').textContent = gameState.heat;
-
-                // Update city button colors
-                const cityButtons = {
-                    'Tijuana': document.getElementById('tijuana-btn'),
-                    'ElPaso': document.getElementById('elpaso-btn'),
-                    'Nogales': document.getElementById('nogales-btn')
-                };
-                Object.keys(cityButtons).forEach(function(city) {
-                    if (city === gameState.location) {
-                        cityButtons[city].classList.remove('bg-white');
-                        cityButtons[city].classList.add('bg-gray-300');
-                    } else {
-                        cityButtons[city].classList.remove('bg-gray-300');
-                        cityButtons[city].classList.add('bg-white');
-                    }
-                });
-
-                const market = document.getElementById('market');
-                market.innerHTML = '';
-                items.forEach(function(item) {
-                    const price = (gameState.prices[gameState.location] && gameState.prices[gameState.location][item.name]) || 0;
-                    market.innerHTML += `
-                        <tr>
-                            <td>${item.displayName}</td>
-                            <td>$${price.toLocaleString()}</td>
-                            <td><button class="btn bg-green-600 text-white py-1 px-2 rounded" onclick="buy('${item.name}', ${price})">Buy</button></td>
-                        </tr>`;
-                });
-
-                const inventory = document.getElementById('inventory');
-                inventory.innerHTML = '';
-                items.forEach(function(item) {
-                    const qty = gameState.inventory[item.name] || 0;
-                    if (qty > 0) {
-                        const price = (gameState.prices[gameState.location] && gameState.prices[gameState.location][item.name]) || 0;
-                        inventory.innerHTML += `
-                            <tr>
-                                <td>${item.displayName}</td>
-                                <td>${qty}</td>
-                                <td><button class="btn bg-red-600 text-white py-1 px-2 rounded" onclick="sell('${item.name}', ${price})">Sell</button></td>
-                            </tr>`;
-                    }
-                });
-                console.log('UI updated at line 217');
-            }
-
-            function buy(item, price) {
-                console.log('Buying at line 221:', item, price);
-                const totalUnits = Object.values(gameState.inventory).reduce(function(sum, qty) { return sum + qty; }, 0);
-                const itemData = items.find(i => i.name === item);
-                if (totalUnits < gameState.maxInventory && gameState.cash >= price) {
-                    gameState.inventory[item] = (gameState.inventory[item] || 0) + 1;
-                    gameState.cash -= price;
-                    gameState.heat = Math.min(100, gameState.heat + itemData.heatBuy);
-                    logEvent(`Bought 1 ${itemData.displayName} for $${price.toLocaleString()}. Heat increased by ${itemData.heatBuy} to ${gameState.heat}%.`);
-                    if (!checkPerActionRisk('buying')) {
-                        updateUI();
-                    }
-                } else {
-                    logEvent('Not enough cash or inventory space!');
-                }
-            }
-
-            function sell(item, price) {
-                console.log('Selling at line 233:', item, price);
-                if (gameState.inventory[item] > 0) {
-                    const itemData = items.find(i => i.name === item);
-                    gameState.inventory[item]--;
-                    gameState.cash += price;
-                    gameState.heat = Math.min(100, gameState.heat + itemData.heatSell);
-                    logEvent(`Sold 1 ${itemData.displayName} for $${price.toLocaleString()}. Heat increased by ${itemData.heatSell} to ${gameState.heat}%.`);
-                    if (!checkPerActionRisk('selling')) {
-                        updateUI();
-                    }
-                }
-            }
-
-            function travel(city) {
-                console.log('Traveling at line 243:', city);
-                const validCities = ['Tijuana', 'ElPaso', 'Nogales'];
-                if (gameState.travelsLeft <= 0) {
-                    logEvent('No travels left today! End the day to reset travels.');
-                    return;
-                }
-                if (validCities.includes(city) && city !== gameState.location) {
-                    gameState.location = city;
-                    gameState.travelsLeft--;
-                    gameState.heat = Math.min(100, gameState.heat + 2);
-                    logEvent(`Traveled to ${city}. Heat increased by 2 to ${gameState.heat}%. Travels left: ${gameState.travelsLeft}.`);
-                    if (!checkPerActionRisk('traveling')) {
-                        updateUI();
-                    }
-                } else {
-                    console.log(`Invalid or same city: ${city} at line 250`);
-                    logEvent(`Cannot travel to ${city}.`);
-                }
-            }
-
-            function updatePrices(item, multiplier) {
-                console.log('Updating prices at line 253:', item, multiplier);
-                Object.keys(gameState.prices).forEach(function(city) {
-                    if (gameState.prices[city][item]) {
-                        gameState.prices[city][item] = Math.floor(gameState.prices[city][item] * multiplier);
-                    }
-                });
-            }
-
-            function logEvent(message) {
-                console.log('Logging event at line 262:', message);
-                const log = document.getElementById('event-log');
-                log.innerHTML += `<p>${message}</p>`;
-                log.scrollTop = log.scrollHeight;
-            }
-
-            function nextDay() {
-                console.log('Advancing to next day at line 269');
-                if (gameState.day >= 30) {
-                    endGame();
-                    return;
-                }
-                gameState.day++;
-                gameState.debt += Math.floor(gameState.debt * 0.05);
-                if (gameState.heat > 20) {
-                    gameState.heat = Math.max(20, Math.floor(gameState.heat * 0.95));
-                    logEvent(`Heat decreased by 5% to ${gameState.heat}% at the start of the day.`);
-                }
-                const heatIncrease = Math.floor(Math.random() * 5);
-                gameState.heat = Math.min(100, gameState.heat + heatIncrease);
-                logEvent(`Day ${gameState.day} started. Heat increased by ${heatIncrease} to ${gameState.heat}%. Debt increased to $${gameState.debt.toLocaleString()}.`);
-                gameState.travelsLeft = gameState.maxTravels;
-                initializePrices();
-                logEvent('New day, new prices—check the market!');
-
-                if (Math.random() < 0.3) {
-                    const event = events[Math.floor(Math.random() * events.length)];
-                    logEvent(event.message);
-                    event.effect();
-                }
-
-                let didRivalAttackOccur = false;
-                if (gameState.heat >= 60) {
-                    const rivalChance = 0.1 + (0.2 * (gameState.heat - 60) / 40); // 10% at 60, 30% at 100
-                    const rivalRoll = Math.random();
-                    console.log(`Daily rival attack chance: ${(rivalChance * 100).toFixed(1)}% (rolled ${rivalRoll.toFixed(3)}).`);
-                    if (rivalRoll < rivalChance) {
-                        logEvent('Sinaloa cartel attacks! Lose 30% inventory and 15% cash.');
-                        Object.keys(gameState.inventory).forEach(function(item) {
-                            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
-                        });
-                        gameState.cash = Math.floor(gameState.cash * 0.85);
-                        gameState.heat = Math.max(0, gameState.heat - 10);
-                        logEvent(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
-                        didRivalAttackOccur = true;
-                    }
-                }
-
-                if (!didRivalAttackOccur && gameState.heat >= 80) {
-                    const bustChance = 0.2 + (0.2 * (gameState.heat - 80) / 20); // 20% at 80, 40% at 100
-                    const bustRoll = Math.random();
-                    console.log(`Daily bust chance: ${(bustChance * 100).toFixed(1)}% (rolled ${bustRoll.toFixed(3)}).`);
-                    if (bustRoll < bustChance) {
-                        logEvent('Tom Homan’s task force raids! Lose all inventory and 50% cash.');
-                        gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
-                        gameState.cash = Math.floor(gameState.cash * 0.5);
-                        gameState.heat = 0;
-                        logEvent('Heat reset to 0% after raid.');
-                    }
-                }
-
-                updateUI();
-            }
-
-            function endGame() {
-                console.log('Ending game at line 293');
-                const score = gameState.cash - gameState.debt;
-                logEvent(`Game Over! Final Score: $${score.toLocaleString()}`);
-                document.querySelectorAll('.btn').forEach(function(btn) { btn.disabled = true; });
-            }
-
-            console.log('Initializing game at line 299');
-            initializePrices();
-            updateUI();
-            logEvent('Welcome to Border Cartel! Build your empire, but watch out for Tom Homan!');
-            console.log('Game initialized at line 303');
-        } catch (e) {
-            console.error('Script parsing error at line 305:', e);
+    function updatePrices(item, multiplier) {
+      cities.forEach(city => {
+        if (gameState.prices[city][item]) {
+          gameState.prices[city][item] = Math.floor(gameState.prices[city][item] * multiplier);
         }
-    </script>
+      });
+    }
+
+    /* ----------------- UI BUILD ----------------- */
+    function buildTravelBar() {
+      const bar = document.getElementById('travelBar');
+      bar.innerHTML = '';
+      cities.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'city-btn';
+        btn.dataset.city = c;
+        btn.textContent = c === 'ElPaso' ? 'El Paso' : c;
+        btn.onclick = () => travel(c);
+        bar.appendChild(btn);
+      });
+    }
+
+    function highlightCity() {
+      document.querySelectorAll('.city-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.city === gameState.location);
+      });
+    }
+
+    function renderMarket() {
+      const tbody = document.getElementById('marketBody');
+      tbody.innerHTML = '';
+      Object.keys(items).forEach(k => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${items[k].displayName}</td>
+          <td>$${gameState.prices[gameState.location][k].toLocaleString()}</td>
+          <td><button class="buy" onclick="buy('${k}')">Buy</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderInv() {
+      const tbody = document.getElementById('invBody');
+      tbody.innerHTML = '';
+      Object.keys(items).forEach(k => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${items[k].displayName}</td>
+          <td>${gameState.inventory[k]}</td>
+          <td><button class="sell" onclick="sell('${k}')" ${gameState.inventory[k] === 0 ? 'disabled' : ''}>Sell</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateUI() {
+      document.getElementById('day').textContent = gameState.day;
+      document.getElementById('cash').textContent = gameState.cash.toLocaleString();
+      document.getElementById('debt').textContent = gameState.debt.toLocaleString();
+      document.getElementById('location').textContent = gameState.location === 'ElPaso' ? 'El Paso' : gameState.location;
+      document.getElementById('travels-left').textContent = gameState.travelsLeft;
+      document.getElementById('heat').textContent = `${gameState.heat}%`;
+      highlightCity();
+      renderMarket();
+      renderInv();
+    }
+
+    /* ----------------- GAME MECHANICS ----------------- */
+    function checkPerActionRisk(actionType) {
+      if (gameState.heat >= 80) {
+        const bustChance = 0.05 + (0.05 * (gameState.heat - 80) / 20); // 5% at 80, 10% at 100
+        const bustRoll = rand();
+        if (bustRoll < bustChance) {
+          log(`Border Czar raid after ${actionType}! Lose all inventory and 50% cash.`);
+          gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
+          gameState.cash = Math.floor(gameState.cash * 0.5);
+          gameState.heat = 0;
+          log('Heat reset to 0% after raid.');
+          return true;
+        }
+      }
+      if (gameState.heat >= 60) {
+        const rivalChance = 0.03 + (0.05 * (gameState.heat - 60) / 40); // 3% at 60, 8% at 100
+        const rivalRoll = rand();
+        if (rivalRoll < rivalChance) {
+          log(`Rival cartel attack after ${actionType}! Lose 30% inventory and 15% cash.`);
+          Object.keys(gameState.inventory).forEach(function(item) {
+            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
+          });
+          gameState.cash = Math.floor(gameState.cash * 0.85);
+          gameState.heat = Math.max(0, gameState.heat - 10);
+          log(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /* ----------------- PLAYER ACTIONS ----------------- */
+    function travel(city) {
+      if (city === gameState.location) {
+        log(`Cannot travel to ${city} - you're already there!`);
+        return;
+      }
+      if (gameState.travelsLeft <= 0) {
+        log('No travels left today! End the day to reset travels.');
+        return;
+      }
+      gameState.location = city;
+      gameState.travelsLeft--;
+      gameState.heat = clamp(gameState.heat + 2, 0, 100);
+      log(`Traveled to ${city}. Heat increased by 2 to ${gameState.heat}%. Travels left: ${gameState.travelsLeft}.`);
+      if (!checkPerActionRisk('traveling')) {
+        updateUI();
+      }
+    }
+
+    function buy(item) {
+      const price = gameState.prices[gameState.location][item];
+      if (gameState.cash < price) {
+        log('Not enough cash');
+        return;
+      }
+      const invCount = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
+      if (invCount >= gameState.maxInventory) {
+        log('Inventory full');
+        return;
+      }
+      gameState.cash -= price;
+      gameState.inventory[item]++;
+      gameState.heat = clamp(gameState.heat + items[item].heatBuy, 0, 100);
+      log(`Bought 1 ${items[item].displayName} for $${price.toLocaleString()}. Heat increased by ${items[item].heatBuy} to ${gameState.heat}%.`);
+      if (!checkPerActionRisk('buying')) {
+        updateUI();
+      }
+    }
+
+    function sell(item) {
+      if (gameState.inventory[item] === 0) return;
+      const price = gameState.prices[gameState.location][item];
+      gameState.cash += price;
+      gameState.inventory[item]--;
+      gameState.heat = clamp(gameState.heat + items[item].heatSell, 0, 100);
+      log(`Sold 1 ${items[item].displayName} for $${price.toLocaleString()}. Heat increased by ${items[item].heatSell} to ${gameState.heat}%.`);
+      if (!checkPerActionRisk('selling')) {
+        updateUI();
+      }
+    }
+
+    /* ----------------- NEXT DAY ----------------- */
+    document.getElementById('nextDayBtn').addEventListener('click', nextDay);
+    function nextDay() {
+      if (gameState.day >= 30) {
+        log('Game over! Final Score: $' + (gameState.cash - gameState.debt).toLocaleString());
+        document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        return;
+      }
+      gameState.day++;
+      gameState.debt = Math.round(gameState.debt * 1.05);
+      if (gameState.heat > 20) {
+        gameState.heat = Math.max(20, Math.floor(gameState.heat * 0.95));
+        log(`Heat decreased by 5% to ${gameState.heat}% at the start of the day.`);
+      }
+      const heatIncrease = Math.floor(rand() * 5);
+      gameState.heat = clamp(gameState.heat + heatIncrease, 0, 100);
+      log(`Day ${gameState.day} started. Heat increased by ${heatIncrease} to ${gameState.heat}%. Debt increased to $${gameState.debt.toLocaleString()}.`);
+      gameState.travelsLeft = gameState.maxTravels;
+      initPrices();
+      log('New day, new prices—check the market!');
+
+      if (rand() < 0.3) {
+        const event = events[Math.floor(rand() * events.length)];
+        log(event.message);
+        event.effect();
+      }
+
+      let didRivalAttackOccur = false;
+      if (gameState.heat >= 60) {
+        const rivalChance = 0.1 + (0.2 * (gameState.heat - 60) / 40); // 10% at 60, 30% at 100
+        const rivalRoll = rand();
+        if (rivalRoll < rivalChance) {
+          log('Sinaloa cartel attacks! Lose 30% inventory and 15% cash.');
+          Object.keys(gameState.inventory).forEach(function(item) {
+            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
+          });
+          gameState.cash = Math.floor(gameState.cash * 0.85);
+          gameState.heat = Math.max(0, gameState.heat - 10);
+          log(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
+          didRivalAttackOccur = true;
+        }
+      }
+
+      if (!didRivalAttackOccur && gameState.heat >= 80) {
+        const bustChance = 0.2 + (0.2 * (gameState.heat - 80) / 20); // 20% at 80, 40% at 100
+        const bustRoll = rand();
+        if (bustRoll < bustChance) {
+          log('Tom Homan’s task force raids! Lose all inventory and 50% cash.');
+          gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
+          gameState.cash = Math.floor(gameState.cash * 0.5);
+          gameState.heat = 0;
+          log('Heat reset to 0% after raid.');
+        }
+      }
+
+      updateUI();
+    }
+
+    /* ----------------- INIT ----------------- */
+    (function init() {
+      buildTravelBar();
+      initPrices();
+      updateUI();
+      log('Welcome to Border Cartel! Build your empire, but watch out for Tom Homan!');
+    })();
+  </script>
 </body>
 </html>
