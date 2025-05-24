@@ -1,0 +1,428 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Border Cartel</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body { font-family: 'Courier New', monospace; background-color: #1a202c; color: #e2e8f0; }
+        .game-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .inventory-table, .market-table { width: 100%; border-collapse: collapse; }
+        .inventory-table th, .inventory-table td, .market-table th, .market-table td { border: 1px solid #4a5568; padding: 8px; text-align: center; }
+        .btn { transition: background-color 0.3s; }
+        .btn:hover { background-color: #d1d5db; } /* Hover effect for light gray */
+        #event-log { height: 100px; overflow-y: scroll; background-color: #2d3748; padding: 10px; border-radius: 5px; }
+        .tooltip { position: relative; display: inline-block; cursor: pointer; }
+        .tooltip .tooltiptext { 
+            visibility: hidden; width: 200px; background-color: #4a5568; color: #fff; 
+            text-align: center; border-radius: 5px; padding: 5px; position: absolute; 
+            z-index: 1; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; 
+            transition: opacity 0.3s; 
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .ad-container { margin-top: 10px; text-align: center; }
+        .ad-placeholder { background-color: #4a5568; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl font-bold text-center mb-4">Border Cartel</h1>
+        <div class="flex justify-between mb-4">
+            <div>
+                <p><strong>Day:</strong> <span id="day">1</span>/30</p>
+                <p><strong>Cash:</strong> $<span id="cash">5000</span></p>
+                <p><strong>Debt:</strong> $<span id="debt">10000</span></p>
+            </div>
+            <div>
+                <p><strong>Location:</strong> <span id="location">Tijuana</span></p>
+                <p><strong>Travels Left:</strong> <span id="travels-left">5</span></p>
+                <p class="tooltip">
+                    <strong>Heat:</strong> <span id="heat">0</span>%
+                    <span class="tooltiptext">Heat increases with buy/sell/travel, raising risks of getting busted or robbed.</span>
+                </p>
+            </div>
+        </div>
+
+        <h2 class="text-xl font-semibold mb-2">Travel</h2>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+            <button id="tijuana-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('Tijuana')">Tijuana</button>
+            <button id="elpaso-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('ElPaso')">El Paso</button>
+            <button id="nogales-btn" class="btn bg-white text-black py-2 px-4 rounded" onclick="travel('Nogales')">Nogales</button>
+        </div>
+
+        <h2 class="text-xl font-semibold mb-2">Market</h2>
+        <table class="market-table mb-4">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="market"></tbody>
+        </table>
+
+        <h2 class="text-xl font-semibold mb-2">Inventory</h2>
+        <table class="inventory-table mb-4">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="inventory"></tbody>
+        </table>
+
+        <h2 class="text-xl font-semibold mb-2">Event Log</h2>
+        <div id="event-log" class="text-sm"></div>
+
+        <button class="btn bg-red-600 text-white py-2 px-4 rounded mt-4" onclick="nextDay()">Next Day</button>
+        <div class="ad-container">
+            <div class="ad-placeholder">Ad Space: 300x250 Banner Ad Here</div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Starting script parse at line 100');
+        try {
+            // Inventory
+            console.log('Parsing inventory at line 103');
+            const inventory = { fentanyl: 0, meth: 0, weapons: 0 };
+            console.log('inventory parsed at line 105:', JSON.stringify(inventory));
+
+            // Prices
+            console.log('Parsing prices at line 108');
+            const prices = {
+                Tijuana: { fentanyl: 0, meth: 0, weapons: 0 },
+                ElPaso: { fentanyl: 0, meth: 0, weapons: 0 },
+                Nogales: { fentanyl: 0, meth: 0, weapons: 0 }
+            };
+            console.log('prices parsed at line 113:', JSON.stringify(prices));
+
+            // gameState
+            console.log('Parsing gameState at line 116');
+            let gameState = {
+                day: 1,
+                cash: 5000,
+                debt: 10000,
+                location: 'Tijuana',
+                heat: 0,
+                inventory: inventory,
+                maxInventory: 100,
+                prices: prices,
+                travelsLeft: 5,
+                maxTravels: 5
+            };
+            console.log('gameState parsed at line 126:', JSON.stringify(gameState));
+
+            // items
+            console.log('Parsing items at line 129');
+            const items = [
+                { name: 'fentanyl', displayName: 'Fentanyl', basePrice: 10000, volatility: 0.7, heatBuy: 5, heatSell: 3 },
+                { name: 'meth', displayName: 'Meth', basePrice: 5000, volatility: 0.5, heatBuy: 5, heatSell: 3 },
+                { name: 'weapons', displayName: 'Weapons', basePrice: 20000, volatility: 0.6, heatBuy: 7, heatSell: 5 }
+            ];
+            console.log('items parsed at line 134:', JSON.stringify(items));
+
+            // Random events
+            console.log('Parsing events at line 137');
+            const event = {
+                message: 'DEA bust in Tijuana! Fentanyl prices spike.',
+                effect: function() { updatePrices('fentanyl', 1.5); }
+            };
+            console.log('event parsed at line 141:', JSON.stringify({ message: event.message }));
+            const events = [event];
+            console.log('events array parsed at line 143:', JSON.stringify(events.map(e => ({ message: e.message }))));
+
+            function initializePrices() {
+                console.log('Initializing prices at line 147');
+                const cities = ['Tijuana', 'ElPaso', 'Nogales'];
+                cities.forEach(function(city) {
+                    items.forEach(function(item) {
+                        if (item.name && gameState.prices[city]) {
+                            try {
+                                gameState.prices[city][item.name] = Math.floor(item.basePrice * (1 + (Math.random() - 0.5) * item.volatility));
+                                console.log(`Set price for ${item.displayName} in ${city}: ${gameState.prices[city][item.name]} at line 153`);
+                            } catch (e) {
+                                console.error(`Error setting price for ${item.displayName} in ${city} at line 154:`, e);
+                            }
+                        } else {
+                            console.error(`Invalid item name or city at line 156:`, item, city);
+                        }
+                    });
+                });
+                console.log('Prices initialized at line 159:', JSON.stringify(gameState.prices));
+            }
+
+            function checkPerActionRisk(actionType) {
+                console.log(`Checking per-action risk after ${actionType} at line 163`);
+                if (gameState.heat >= 80) {
+                    const bustChance = 0.05 + (0.05 * (gameState.heat - 80) / 20); // 5% at 80, 10% at 100
+                    const bustRoll = Math.random();
+                    console.log(`Per-action bust chance: ${(bustChance * 100).toFixed(1)}% (rolled ${bustRoll.toFixed(3)}).`);
+                    if (bustRoll < bustChance) {
+                        logEvent(`Border Czar raid after ${actionType}! Lose all inventory and 50% cash.`);
+                        gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
+                        gameState.cash = Math.floor(gameState.cash * 0.5);
+                        gameState.heat = 0;
+                        logEvent('Heat reset to 0% after raid.');
+                        return true;
+                    }
+                }
+                if (gameState.heat >= 60) {
+                    const rivalChance = 0.03 + (0.05 * (gameState.heat - 60) / 40); // 3% at 60, 8% at 100
+                    const rivalRoll = Math.random();
+                    console.log(`Per-action rival attack chance: ${(rivalChance * 100).toFixed(1)}% (rolled ${rivalRoll.toFixed(3)}).`);
+                    if (rivalRoll < rivalChance) {
+                        logEvent(`Rival cartel attack after ${actionType}! Lose 30% inventory and 15% cash.`);
+                        Object.keys(gameState.inventory).forEach(function(item) {
+                            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
+                        });
+                        gameState.cash = Math.floor(gameState.cash * 0.85);
+                        gameState.heat = Math.max(0, gameState.heat - 10);
+                        logEvent(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function updateUI() {
+                console.log('Updating UI at line 190');
+                document.getElementById('day').textContent = gameState.day;
+                document.getElementById('cash').textContent = gameState.cash.toLocaleString();
+                document.getElementById('debt').textContent = gameState.debt.toLocaleString();
+                document.getElementById('location').textContent = gameState.location === 'ElPaso' ? 'El Paso' : gameState.location;
+                document.getElementById('travels-left').textContent = gameState.travelsLeft;
+                document.getElementById('heat').textContent = gameState.heat;
+
+                // Update city button colors
+                const cityButtons = {
+                    'Tijuana': document.getElementById('tijuana-btn'),
+                    'ElPaso': document.getElementById('elpaso-btn'),
+                    'Nogales': document.getElementById('nogales-btn')
+                };
+                Object.keys(cityButtons).forEach(function(city) {
+                    if (city === gameState.location) {
+                        cityButtons[city].classList.remove('bg-white');
+                        cityButtons[city].classList.add('bg-gray-300');
+                    } else {
+                        cityButtons[city].classList.remove('bg-gray-300');
+                        cityButtons[city].classList.add('bg-white');
+                    }
+                });
+
+                const market = document.getElementById('market');
+                market.innerHTML = '';
+                items.forEach(function(item) {
+                    const price = (gameState.prices[gameState.location] && gameState.prices[gameState.location][item.name]) || 0;
+                    market.innerHTML += `
+                        <tr>
+                            <td>${item.displayName}</td>
+                            <td>$${price.toLocaleString()}</td>
+                            <td><button class="btn bg-green-600 text-white py-1 px-2 rounded" onclick="buy('${item.name}', ${price})">Buy</button></td>
+                        </tr>`;
+                });
+
+                const inventory = document.getElementById('inventory');
+                inventory.innerHTML = '';
+                items.forEach(function(item) {
+                    const qty = gameState.inventory[item.name] || 0;
+                    if (qty > 0) {
+                        const price = (gameState.prices[gameState.location] && gameState.prices[gameState.location][item.name]) || 0;
+                        inventory.innerHTML += `
+                            <tr>
+                                <td>${item.displayName}</td>
+                                <td>${qty}</td>
+                                <td><button class="btn bg-red-600 text-white py-1 px-2 rounded" onclick="sell('${item.name}', ${price})">Sell</button></td>
+                            </tr>`;
+                    }
+                });
+                console.log('UI updated at line 217');
+            }
+
+            function buy(item, price) {
+                console.log('Buying at line 221:', item, price);
+                const totalUnits = Object.values(gameState.inventory).reduce(function(sum, qty) { return sum + qty; }, 0);
+                const itemData = items.find(i => i.name === item);
+                if (totalUnits < gameState.maxInventory && gameState.cash >= price) {
+                    gameState.inventory[item] = (gameState.inventory[item] || 0) + 1;
+                    gameState.cash -= price;
+                    gameState.heat = Math.min(100, gameState.heat + itemData.heatBuy);
+                    logEvent(`Bought 1 ${itemData.displayName} for $${price.toLocaleString()}. Heat increased by ${itemData.heatBuy} to ${gameState.heat}%.`);
+                    if (!checkPerActionRisk('buying')) {
+                        updateUI();
+                    }
+                } else {
+                    logEvent('Not enough cash or inventory space!');
+                }
+            }
+
+            function sell(item, price) {
+                console.log('Selling at line 233:', item, price);
+                if (gameState.inventory[item] > 0) {
+                    const itemData = items.find(i => i.name === item);
+                    gameState.inventory[item]--;
+                    gameState.cash += price;
+                    gameState.heat = Math.min(100, gameState.heat + itemData.heatSell);
+                    logEvent(`Sold 1 ${itemData.displayName} for $${price.toLocaleString()}. Heat increased by ${itemData.heatSell} to ${gameState.heat}%.`);
+                    if (!checkPerActionRisk('selling')) {
+                        updateUI();
+                    }
+                }
+            }
+
+            function travel(city) {
+                console.log('Traveling at line 243:', city);
+                const validCities = ['Tijuana', 'ElPaso', 'Nogales'];
+                if (gameState.travelsLeft <= 0) {
+                    logEvent('No travels left today! End the day to reset travels.');
+                    return;
+                }
+                if (validCities.includes(city) && city !== gameState.location) {
+                    gameState.location = city;
+                    gameState.travelsLeft--;
+                    gameState.heat = Math.min(100, gameState.heat + 2);
+                    logEvent(`Traveled to ${city}. Heat increased by 2 to ${gameState.heat}%. Travels left: ${gameState.travelsLeft}.`);
+                    if (!checkPerActionRisk('traveling')) {
+                        updateUI();
+                    }
+                } else {
+                    console.log(`Invalid or same city: ${city} at line 250`);
+                    logEvent(`Cannot travel to ${city}.`);
+                }
+            }
+
+            function updatePrices(item, multiplier) {
+                console.log('Updating prices at line 253:', item, multiplier);
+                Object.keys(gameState.prices).forEach(function(city) {
+                    if (gameState.prices[city][item]) {
+                        gameState.prices[city][item] = Math.floor(gameState.prices[city][item] * multiplier);
+                    }
+                });
+            }
+
+            function logEvent(message) {
+                console.log('Logging event at line 262:', message);
+                const log = document.getElementById('event-log');
+                log.innerHTML += `<p>${message}</p>`;
+                log.scrollTop = log.scrollHeight;
+            }
+
+            function nextDay() {
+                console.log('Advancing to next day at line 269');
+                if (gameState.day >= 30) {
+                    endGame();
+                    return;
+                }
+                gameState.day++;
+                gameState.debt += Math.floor(gameState.debt * 0.05);
+                if (gameState.heat > 20) {
+                    gameState.heat = Math.max(20, Math.floor(gameState.heat * 0.95));
+                    logEvent(`Heat decreased by 5% to ${gameState.heat}% at the start of the day.`);
+                }
+                const heatIncrease = Math.floor(Math.random() * 5);
+                gameState.heat = Math.min(100, gameState.heat + heatIncrease);
+                logEvent(`Day ${gameState.day} started. Heat increased by ${heatIncrease} to ${gameState.heat}%. Debt increased to $${gameState.debt.toLocaleString()}.`);
+                gameState.travelsLeft = gameState.maxTravels;
+                initializePrices();
+                logEvent('New day, new prices—check the market!');
+
+                if (Math.random() < 0.3) {
+                    const event = events[Math.floor(Math.random() * events.length)];
+                    logEvent(event.message);
+                    event.effect();
+                }
+
+                let didRivalAttackOccur = false;
+                if (gameState.heat >= 60) {
+                    const rivalChance = 0.1 + (0.2 * (gameState.heat - 60) / 40); // 10% at 60, 30% at 100
+                    const rivalRoll = Math.random();
+                    console.log(`Daily rival attack chance: ${(rivalChance * 100).toFixed(1)}% (rolled ${rivalRoll.toFixed(3)}).`);
+                    if (rivalRoll < rivalChance) {
+                        logEvent('Sinaloa cartel attacks! Lose 30% inventory and 15% cash.');
+                        Object.keys(gameState.inventory).forEach(function(item) {
+                            gameState.inventory[item] = Math.floor(gameState.inventory[item] * 0.7);
+                        });
+                        gameState.cash = Math.floor(gameState.cash * 0.85);
+                        gameState.heat = Math.max(0, gameState.heat - 10);
+                        logEvent(`Heat reduced by 10 to ${gameState.heat}% after rival attack.`);
+                        didRivalAttackOccur = true;
+                    }
+                }
+
+                if (!didRivalAttackOccur && gameState.heat >= 80) {
+                    const bustChance = 0.2 + (0.2 * (gameState.heat - 80) / 20); // 20% at 80, 40% at 100
+                    const bustRoll = Math.random();
+                    console.log(`Daily bust chance: ${(bustChance * 100).toFixed(1)}% (rolled ${bustRoll.toFixed(3)}).`);
+                    if (bustRoll < bustChance) {
+                        logEvent('Tom Homan’s task force raids! Lose all inventory and 50% cash.');
+                        gameState.inventory = { fentanyl: 0, meth: 0, weapons: 0 };
+                        gameState.cash = Math.floor(gameState.cash * 0.5);
+                        gameState.heat = 0;
+                        logEvent('Heat reset to 0% after raid.');
+                    }
+                }
+
+                updateUI();
+            }
+
+            function endGame() {
+                console.log('Ending game at line 293');
+                const score = gameState.cash - gameState.debt;
+                logEvent(`Game Over! Final Score: $${score.toLocaleString()}`);
+                document.querySelectorAll('.btn').forEach(function(btn) { btn.disabled = true; });
+            }
+
+            console.log('Initializing game at line 299');
+            initializePrices();
+            updateUI();
+            logEvent('Welcome to Border Cartel! Build your empire, but watch out for Tom Homan!');
+            console.log('Game initialized at line 303');
+        } catch (e) {
+            console.error('Script parsing error at line 305:', e);
+        }
+    </script>
+</body>
+</html>
